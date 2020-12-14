@@ -1,4 +1,13 @@
-use charsub::{Cell, RuleCell, Generator, RuleEntry, ConstPattern, ModulusPattern, Handler, UnitPair};
+use charsub::{
+    Cell,
+    RuleCell,
+    Generator,
+    RuleEntry,
+    ConstPattern,
+    ModulusPattern,
+    Handler,
+    UnitPair
+};
 
 use structopt::StructOpt;
 use std::collections::HashMap;
@@ -87,6 +96,9 @@ struct Opt {
     #[structopt()]
     input: String,
 
+    #[structopt(short, long, default_value="0")]
+    generation: usize,
+
     /// Output file, stdout if not present
     #[structopt(parse(try_from_str=parse_rule))]
     rules: Vec<(u8, RuleEntry)>,
@@ -95,14 +107,15 @@ struct Opt {
 struct ConstructedOpts {
     handler: Pattern,
     root: Cell,
-    rules: HashMap<u8, RuleEntry>
+    rules: HashMap<u8, RuleEntry>,
+    until: usize
 }
 
 impl From<Opt> for ConstructedOpts {
     fn from(x: Opt) -> ConstructedOpts {
         ConstructedOpts {
             handler: Pattern::from(x.handler),
-            
+            until: x.generation,
             root: {
                 let mut cell = Cell::new();
                 cell.extend(x.input.bytes());
@@ -129,6 +142,8 @@ fn main() {
     
     loop {
         if gen.new_generation(&mut opt.handler) == 0 { break }    
+        if opt.until != 0 && generation >= opt.until { break }
+
         generation += 1;
         //println!("last [{}:{}]: {:?}...", gen.current_generation(), gen.last_idx(), gen.last_generation().iter().take(10).collect::<SmallVec<[&Cell; 16]>>())
     }

@@ -9,6 +9,5 @@ edition = "2018"
 [lib]
 name = "charsub"
 
-
 [dependencies]
 smallvec = "*"

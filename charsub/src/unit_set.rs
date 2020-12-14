@@ -2,7 +2,7 @@ use crate::{
     Cell, RuleCell,
     patterns::RuleEntry,
     unit::UnitPair,
-    patterns::{Handler, Rule}
+    patterns::Handler;
 };
 use std::collections::{HashMap, HashSet};
 

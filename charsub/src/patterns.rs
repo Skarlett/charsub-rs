@@ -7,20 +7,6 @@ use crate::{
     unit::UnitPair
 };
 
-pub struct Rule<'r> {
-    pub idx: usize,
-    pub inner: &'r RuleEntry
-}
-
-impl<'r> From<(usize, &'r RuleEntry)> for Rule<'r> {
-    fn from(data: (usize, &'r RuleEntry)) -> Self {
-        Self {
-            idx: data.0,
-            inner: data.1
-        }
-    }
-}
-
 pub trait Handler {
     fn handle(&mut self, permute: &UnitPair<'_>) -> bool;
 }
@@ -53,8 +39,6 @@ impl From<RuleEntry> for RuleCell {
         }
     }
 }
-
-
 
 
 #[derive(Default)]
