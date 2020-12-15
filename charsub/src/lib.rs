@@ -1,12 +1,14 @@
 mod patterns;
 mod unit;
-mod unit_set;
+mod cursor;
+mod api;
 
 
-pub use patterns::{Handler, RuleEntry, ConstPattern, ModulusPattern};
-pub use unit_set::Generator;
 pub use unit::UnitPair;
 
+
+pub use api::*;
+
 use smallvec::SmallVec;
-pub type Cell = SmallVec<[u8; 32]>;
+type Cell = SmallVec<[u8; 32]>;
 pub type RuleCell = SmallVec<[u8; 8]>;

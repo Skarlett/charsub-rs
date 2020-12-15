@@ -10,5 +10,5 @@ path = "main.rs"
 
 [dependencies]
 charsub = { path = "../charsub" }
-structopt = "0.3"
+structopt = { version = "0.3", feature = ["smallvec"] }
 smallvec = "*"

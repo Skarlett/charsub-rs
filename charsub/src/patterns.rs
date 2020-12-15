@@ -1,13 +1,12 @@
-use std::{
-    collections::{HashMap},
-};
 use crate::{
-    unit_set::Cursor,
     RuleCell,
     unit::UnitPair
 };
 
-pub trait Handler {
+pub trait Handler
+where Self: std::fmt::Debug
+{
+    fn init(&mut self) {}
     fn handle(&mut self, permute: &UnitPair<'_>) -> bool;
 }
 
@@ -20,7 +19,7 @@ pub enum RuleEntry {
 impl RuleEntry {
     pub fn len(&self) -> usize {
         match self {
-            Self::Single(b) => 1,
+            Self::Single(_byte) => 1,
             Self::Multi(buf) => buf.len() 
         }
     }
@@ -41,7 +40,7 @@ impl From<RuleEntry> for RuleCell {
 }
 
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct ConstPattern {}
 impl Handler for ConstPattern {
     fn handle(&mut self, permute: &UnitPair<'_>) -> bool {
@@ -49,7 +48,7 @@ impl Handler for ConstPattern {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct ModulusPattern {}
 impl Handler for ModulusPattern {
     fn handle(&mut self, permute: &UnitPair) -> bool {

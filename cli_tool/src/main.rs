@@ -1,17 +1,11 @@
 use charsub::{
-    Cell,
     RuleCell,
     Generator,
-    RuleEntry,
-    ConstPattern,
-    ModulusPattern,
-    Handler,
-    UnitPair
+    Pattern,
+    Rulebook
 };
 
 use structopt::StructOpt;
-use std::collections::HashMap;
-use smallvec::SmallVec;
 
 #[derive(Debug)]
 enum Error {
@@ -25,10 +19,7 @@ impl std::fmt::Display for Error {
     }
 }
 
-#[derive(Debug)]
-struct State;
-
-fn parse_rule(buf: &str) -> Result<(u8, RuleEntry), Box<dyn std::error::Error>> {
+fn parse_rule(buf: &str) -> Result<(u8, RuleCell), Box<dyn std::error::Error>> {
     const DELIMIER: char = ':';
     let mut iter = buf.split(DELIMIER);
 
@@ -37,108 +28,69 @@ fn parse_rule(buf: &str) -> Result<(u8, RuleEntry), Box<dyn std::error::Error>> 
     let mut rule_entry = RuleCell::new();
     rule_entry.extend(iter.next().unwrap().bytes());
     
-    Ok((root, RuleEntry::Multi(rule_entry)))
+    Ok((root, rule_entry))
 }
 
 #[derive(Debug)]
-enum HandlerInput {
-    Const,
-    Modolo,
-    All
-}
+struct Handler(Pattern);
 
-enum Pattern {
-    Const(ConstPattern),
-    Modulo(ModulusPattern),
-    Multi(SmallVec<[Box<Handler>; 12]>)
-}
-
-impl Handler for Pattern {
-    fn handle(&mut self, permute: &UnitPair<'_>) -> bool {
-        match self {
-            Pattern::Const(hdlr) => hdlr.handle(permute),
-            Pattern::Modulo(hdlr) => hdlr.handle(permute),
-            Pattern::Multi(vec) => vec.iter_mut().any(|x| x.handle(permute))
-        }
-    }
-}
-
-impl From<HandlerInput> for Pattern {
-    fn from(x: HandlerInput) -> Pattern {
-        match x {
-            HandlerInput::Modolo => Pattern::Modulo(Default::default()),
-            HandlerInput::Const => Pattern::Const(Default::default()),
-            All => unimplemented!()
-        }
-    }
-}
-
-impl std::str::FromStr for HandlerInput {
+impl std::str::FromStr for Handler {
     type Err = Error;
 
-    fn from_str(x: &str) -> Result<HandlerInput, Self::Err> {
-        Ok(match x.to_ascii_lowercase().as_str() {
-            "const" => HandlerInput::Const,
-            "modolo" => HandlerInput::Modolo,
-            "all" => HandlerInput::All,
+    fn from_str(x: &str) -> Result<Handler, Self::Err> {
+        Ok(Handler(match x.to_ascii_lowercase().as_str() {
+            "const" => Pattern::Modulo(Default::default()),
+            "modulo" => Pattern::Const(Default::default()),
+            "all" => unimplemented!(),
             _ => return Err(Error::BadHandler)
-        })
+        }))
     }
 }
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "Permutates input based on rules", about = "An example of StructOpt usage.")]
 struct Opt {
-    #[structopt(short, long, default_value="modolo")]
-    handler: HandlerInput,
+    /// Describe which handler you'd like to use
+    #[structopt(short, long, default_value="modulo")]
+    handler: Handler,
 
-    /// Input file
+    /// The root of value of characters are being manipulated.
     #[structopt()]
     input: String,
 
+    /// limit the amount of times it regenerates 
     #[structopt(short, long, default_value="0")]
-    generation: usize,
+    limit: usize,
 
-    /// Output file, stdout if not present
+    /// Substitute characters based on the notation of `from:to` 
+    /// where `to` can be any length, but `from` is restricted to any characer
+    /// example: 1:ilLI a:b b:dp
     #[structopt(parse(try_from_str=parse_rule))]
-    rules: Vec<(u8, RuleEntry)>,
+    rules: Vec<(u8, RuleCell)>,
 }
 
 struct ConstructedOpts {
     handler: Pattern,
-    root: Cell,
-    rules: HashMap<u8, RuleEntry>,
+    root: String,
+    rules: Rulebook,
     until: usize
 }
-
 impl From<Opt> for ConstructedOpts {
     fn from(x: Opt) -> ConstructedOpts {
         ConstructedOpts {
-            handler: Pattern::from(x.handler),
-            until: x.generation,
-            root: {
-                let mut cell = Cell::new();
-                cell.extend(x.input.bytes());
-                cell
-            },
-
-            rules: {
-                let mut map = HashMap::new();
-                for (k, r) in x.rules {
-                    map.insert(k, r);
-                }
-                map
-            }
+            handler: Pattern::from(x.handler.0),
+            until: x.limit,
+            root: x.input,
+            rules: x.rules.into()
         }
     }
 }
 
 fn main() {
-    let mut opt = ConstructedOpts::from(Opt::from_args());
+    let mut opt: ConstructedOpts = Opt::from_args().into();
 
-    let mut gen = Generator::new(&opt.root, &opt.rules);
+    let mut gen = Generator::new(opt.root.as_bytes(), opt.rules);
     let mut generation = 0;
-    
     
     loop {
         if gen.new_generation(&mut opt.handler) == 0 { break }    
