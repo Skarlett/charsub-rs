@@ -11,3 +11,6 @@ name = "charsub"
 
 [dependencies]
 smallvec = "*"
+threadpool = "*"
+tokio = { version = "0.3", feature = ["stream", "rt-core", "rt-threaded", "blocking", "parking_lot"]}
+evc = "0.1"

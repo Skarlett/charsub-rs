@@ -1,13 +1,14 @@
 use std::collections::{HashMap, HashSet};
-pub use crate::patterns::Handler;
-
 use crate::{
     Cell, RuleCell,
+    unit::Permutation,
     patterns::{RuleEntry, ConstPattern, ModulusPattern},
-    unit::UnitPair,
-    cursor::{Cursor, CursorOutput},
+    cursor::{Cursor, Output},
 
 };
+
+pub use crate::patterns::Handler;
+
 pub struct Rulebook(pub HashMap<u8, RuleEntry>);
 
 impl<T> From<T> for Rulebook 
@@ -27,13 +28,11 @@ where T: IntoIterator<Item=(u8, RuleCell)>
     }
 }
 
-
 pub struct Generator {
     total: HashSet<Cell>,
     rules: Rulebook,
-    generation: usize,
+    i: usize,
 }
-
 
 impl Generator {
     pub fn new<T: Into<Rulebook>>(root: &[u8], rules: T) -> Self {
@@ -45,7 +44,7 @@ impl Generator {
         Self {
             rules: rules.into(),
             total: buf,
-            generation: 0,
+            i: 0,
         }
     }
 
@@ -77,10 +76,13 @@ impl Generator {
         }
 
         self.total.extend(generation);
-        self.generation += 1;
+        self.i += 1;
         self.total.len()-original
     }
 
+    pub fn generation(&self) -> usize {
+        self.i
+    }
 }
 
 fn permutate_cell<T: Handler>(cursor: &mut Cursor, handler:&mut T, buffer: &mut Vec<Cell>) -> usize {
@@ -88,8 +90,8 @@ fn permutate_cell<T: Handler>(cursor: &mut Cursor, handler:&mut T, buffer: &mut 
     
     loop {
         match cursor.step() {
-            CursorOutput::Permute(mut permute) => {
-                if !handler.handle(&permute) {
+            Output::Permute(mut permute) => {
+                if !T::handle(&permute) {
                     continue
                 }
                 
@@ -98,38 +100,13 @@ fn permutate_cell<T: Handler>(cursor: &mut Cursor, handler:&mut T, buffer: &mut 
                 }
             },
 
-            CursorOutput::NoPermute(_idx) => {
+            Output::NoPermute(_idx) => {
                 //println!("[{}]{:?}", cursor.cell_idx, cursor.buffer());
                 continue
             },
-            CursorOutput::EndOfLine => break
+            Output::EndOfLine => break
         }
     }
 
     buffer.len()-original
-}
-
-
-use smallvec::SmallVec;
-#[derive(Debug)]
-pub enum Pattern {
-    Const(ConstPattern),
-    Modulo(ModulusPattern),
-    //Multi(Box<dyn Handler>)
-}
-
-impl Default for Pattern {
-    fn default() -> Self {
-        Pattern::Const(Default::default())
-    }
-}
-
-impl Handler for Pattern {
-    fn handle(&mut self, permute: &UnitPair<'_>) -> bool {
-        match self {
-            Pattern::Const(hdlr) => hdlr.handle(permute),
-            Pattern::Modulo(hdlr) => hdlr.handle(permute),
-            //Pattern::Multi(vec) => vec.iter_mut().any(|x| x.handle(permute))
-        }
-    }
 }

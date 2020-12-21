@@ -2,15 +2,15 @@ use crate::RuleCell;
 use crate::patterns::RuleEntry;
 
 #[derive(Debug, PartialEq)]
-pub struct UnitPair<'r> {
-    rule: &'r RuleEntry,
+pub struct Permutation {
+    rule: RuleEntry,
     cell: crate::Cell,
     pub rule_idx: usize,
     pub cell_idx: usize
 }
 
-impl<'r> UnitPair<'r> {
-    pub fn new(cell: crate::Cell, rule: &'r RuleEntry, cell_idx: usize) -> Self {
+impl Permutation {
+    pub fn new(cell: crate::Cell, rule: RuleEntry, cell_idx: usize) -> Self {
         Self {
             cell,
             rule,
@@ -24,7 +24,7 @@ impl<'r> UnitPair<'r> {
     }
 
     pub fn rules(&self) -> &RuleEntry {
-        self.rule
+        &self.rule
     }
 
     pub fn len(&self) -> usize {
@@ -33,15 +33,15 @@ impl<'r> UnitPair<'r> {
 
     /// checks if we should step again
     pub fn peek_next(&self) -> bool {
-        match self.rule {
-            RuleEntry::Single(byte) => !self.rule_idx > 0,
-            RuleEntry::Multi(buf) => self.rule.len() >= self.rule_idx+1
+        match &self.rule {
+            RuleEntry::Single(_byte) => !self.rule_idx > 0,
+            RuleEntry::Multi(buf) => buf.len() >= self.rule_idx+1
         }
     }
 
     pub fn commit<'s>(&'s mut self) -> Option<&'s crate::Cell> {
-        match self.rule {
-            RuleEntry::Single(byte) => {
+        match &self.rule {
+            RuleEntry::Single(_byte) => {
                 if self.rule_idx > 0 {
                     return None
                 }
@@ -77,16 +77,16 @@ mod test {
             RuleEntry::Multi(rules)
         };
 
-        let mut permute = UnitPair::new(cell, &rules, 0);
-
+        let mut permutate = Permutation::new(cell, rules, 0);
         let mut buf = SmallVec::new();
         
         for x in vec![b"A..", b"B.."] {
             buf.extend(x.iter().map(|x| *x));
-            assert_eq!(Some(&buf), permute.commit());
+            assert_eq!(Some(&buf), permutate.commit());
             buf.clear()
-        }        
-        assert_eq!(None, permute.commit());
-        assert_eq!(None, permute.commit());
+        }
+        
+        assert_eq!(None, permutate.commit());
+        assert_eq!(None, permutate.commit());
     }
 }

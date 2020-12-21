@@ -1,13 +1,12 @@
 use crate::{
     RuleCell,
-    unit::UnitPair
+    unit::Permutation
 };
 
 pub trait Handler
-where Self: std::fmt::Debug
+where Self: std::fmt::Debug + Default
 {
-    fn init(&mut self) {}
-    fn handle(&mut self, permute: &UnitPair<'_>) -> bool;
+    fn handle(permute: &Permutation) -> bool;
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -39,19 +38,19 @@ impl From<RuleEntry> for RuleCell {
     }
 }
 
-
 #[derive(Debug, Default)]
-pub struct ConstPattern {}
+pub struct ConstPattern;
 impl Handler for ConstPattern {
-    fn handle(&mut self, permute: &UnitPair<'_>) -> bool {
+    fn handle(permute: &Permutation) -> bool {
         true
     }
 }
 
 #[derive(Debug, Default)]
-pub struct ModulusPattern {}
+pub struct ModulusPattern;
+
 impl Handler for ModulusPattern {
-    fn handle(&mut self, permute: &UnitPair) -> bool {
+    fn handle(permute: &Permutation) -> bool {
         permute.index() % permute.len() == 0
     }
 }

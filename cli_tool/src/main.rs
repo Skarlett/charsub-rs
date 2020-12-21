@@ -11,6 +11,7 @@ use structopt::StructOpt;
 enum Error {
     BadHandler
 }
+
 impl std::error::Error for Error {}
 impl std::fmt::Display for Error {
     fn fmt(&self, x: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -19,21 +20,8 @@ impl std::fmt::Display for Error {
     }
 }
 
-fn parse_rule(buf: &str) -> Result<(u8, RuleCell), Box<dyn std::error::Error>> {
-    const DELIMIER: char = ':';
-    let mut iter = buf.split(DELIMIER);
-
-    let root: u8 = iter.next().unwrap().as_bytes()[0];
-    
-    let mut rule_entry = RuleCell::new();
-    rule_entry.extend(iter.next().unwrap().bytes());
-    
-    Ok((root, rule_entry))
-}
-
 #[derive(Debug)]
 struct Handler(Pattern);
-
 impl std::str::FromStr for Handler {
     type Err = Error;
 
@@ -69,6 +57,18 @@ struct Opt {
     rules: Vec<(u8, RuleCell)>,
 }
 
+fn parse_rule(buf: &str) -> Result<(u8, RuleCell), Box<dyn std::error::Error>> {
+    const DELIMIER: char = ':';
+    let mut iter = buf.split(DELIMIER);
+
+    let root: u8 = iter.next().unwrap().as_bytes()[0];
+    
+    let mut rule_entry = RuleCell::new();
+    rule_entry.extend(iter.next().unwrap().bytes());
+    
+    Ok((root, rule_entry))
+}
+
 struct ConstructedOpts {
     handler: Pattern,
     root: String,
@@ -88,13 +88,12 @@ impl From<Opt> for ConstructedOpts {
 
 fn main() {
     let mut opt: ConstructedOpts = Opt::from_args().into();
-
     let mut gen = Generator::new(opt.root.as_bytes(), opt.rules);
     let mut generation = 0;
     
     loop {
         if gen.new_generation(&mut opt.handler) == 0 { break }    
-        if opt.until != 0 && generation >= opt.until { break }
+        if opt.until != 0 && gen.generation() >= opt.until { break }
 
         generation += 1;
         //println!("last [{}:{}]: {:?}...", gen.current_generation(), gen.last_idx(), gen.last_generation().iter().take(10).collect::<SmallVec<[&Cell; 16]>>())
@@ -104,6 +103,7 @@ fn main() {
     let mut output = Vec::with_capacity(gen.buf().len()+1);
     output.extend(gen.into_buf());
     output.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    
     for x in &output {
         println!("{}", String::from_utf8_lossy(x))
     }

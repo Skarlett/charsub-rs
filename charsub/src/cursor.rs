@@ -1,14 +1,15 @@
 use crate::{
-    Cell, RuleCell,
+    Cell,
+    RuleCell,
     patterns::RuleEntry,
-    unit::UnitPair,
-    patterns::Handler
+    unit::Permutation,
 };
-use std::collections::{HashMap, HashSet};
+
+use std::collections::HashMap;
 
 #[derive(Debug, PartialEq)]
-pub enum CursorOutput<'a> {
-    Permute(UnitPair<'a>),
+pub enum Output {
+    Permute(Permutation),
     NoPermute(usize),
     EndOfLine
 }
@@ -35,20 +36,19 @@ impl<'b, 'r> Cursor<'b, 'r> {
         self.buf
     }
 
-    pub fn step<'s>(&'s mut self) -> CursorOutput<'s> {                
+    pub fn step(&mut self) -> Output {                
         let byte = match self.buf.get(self.cell_idx) {
             Some(byte) => *byte,
             None => {
                 self.cell_idx = 0;
                 self.reset_flag = true;
-                return CursorOutput::EndOfLine
+                return Output::EndOfLine
             }
         };
 
-            
         let output = match self.rule_lookup.get(&byte) {
-            Some(entry) => CursorOutput::Permute(UnitPair::new(self.buf.clone(), entry, self.cell_idx)),
-            None => CursorOutput::NoPermute(self.cell_idx)
+            Some(entry) => Output::Permute(Permutation::new(self.buf.clone(), entry.clone(), self.cell_idx)),
+            None => Output::NoPermute(self.cell_idx)
         };
 
         self.cell_idx += 1;
@@ -81,15 +81,15 @@ mod test {
         for cell_idx in 0..3 {
             let permute = cursor.step();
             match permute {
-                CursorOutput::Permute(permute) => {
+                Output::Permute(permute) => {
                     assert_eq!(permute.index(), cell_idx)
                 },
-                CursorOutput::NoPermute(idx) => assert_eq!(cell_idx, idx),
-                CursorOutput::EndOfLine => assert_eq!(1, 2)
+                Output::NoPermute(idx) => assert_eq!(cell_idx, idx),
+                Output::EndOfLine => assert_eq!(1, 2)
             }
         }
         assert!(!cursor.reset_flag);
-        assert_eq!(cursor.step(), CursorOutput::EndOfLine);
+        assert_eq!(cursor.step(), Output::EndOfLine);
         assert!(cursor.reset_flag);
     }
 }
