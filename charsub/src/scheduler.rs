@@ -1,6 +1,5 @@
 use crate::{
     unit::Permutation,
-    patterns::Handler,
     Cell as CharBuf,
 };
 
@@ -8,25 +7,29 @@ use std::{
     collections::HashSet,
 };
 
-pub trait Scheduler {
-    type Buffer;
-    fn schedule(&mut self, permute: Permutation, buf: &mut Self::Buffer);
-    fn into_buf(&self) -> HashSet<CharBuf> { unimplemented!() }
-    fn buf_len(&self) -> usize { unimplemented!()}
+pub trait Length {
+    fn length(&self) -> usize;
 }
 
-enum SendData {
-    Arc(Arc<Mutex<HashSet<CharBuf>>>),
-    Set(HashSet<CharBuf>)
+pub trait Scheduler {
+    type Buffer: Default + Length;
+    fn schedule(&mut self, permute: Permutation, buf: &mut Self::Buffer);
 }
 
 #[derive(Debug)]
 struct SingleThread;
 
+
+impl Length for HashSet<CharBuf> {
+    fn length(&self) -> usize {
+        self.len()
+    }
+}
+
 impl Scheduler for SingleThread {
     type Buffer = HashSet<CharBuf>;
 
-    fn schedule(&mut self, mut permute: Permutation, buf: &mut r) {
+    fn schedule(&mut self, mut permute: Permutation, buf: &mut Self::Buffer) {
         while let Some(x) = permute.commit() {
             buf.insert(x.clone());
         }
@@ -36,49 +39,46 @@ impl Scheduler for SingleThread {
 
 use std::sync::{Arc, Mutex};
 #[derive(Debug)]
+
 struct MultithreadMutex {
     pool: threadpool::ThreadPool,
-    storage: Arc<Mutex<HashSet<CharBuf>>>
+}
+
+impl Length for Arc<Mutex<HashSet<CharBuf>>> {
+    fn length(&self) -> usize {
+        self.lock().unwrap().len()
+    }
 }
 
 impl Scheduler for MultithreadMutex {
-    type Buffer = HashSet<CharBuf>;
+    type Buffer = Arc<Mutex<HashSet<CharBuf>>>;
 
     fn schedule(&mut self, mut permute: Permutation, buf: &mut Self::Buffer) {
-        let lock = self.storage.clone();
-        self.pool.execute(move || {
-            
-            let mut lock = lock.lock().unwrap();
+        let buf_ref = buf.clone();
+
+        self.pool.execute(move || {    
+            let mut lock = buf_ref.lock().unwrap();
             while let Some(x) = permute.commit() {
                 lock.insert(x.clone());
             }
-        })
+        });
     }
 
-}
-
-#[derive(Clone, Debug, Default)]
-struct EVHashSet(HashSet<CharBuf>);
-
-#[derive(Clone, Debug)]
-enum Operation {
-    Push(CharBuf),
-    Clear,
 }
 
 #[derive(Debug)]
 struct TokioMutex {
     runtime: tokio::runtime::Runtime,
-    buffer: Arc<Mutex<HashSet<CharBuf>>>
 }
 
 impl Scheduler for TokioMutex {
-    type Buffer = HashSet<CharBuf>;
+    type Buffer = Arc<Mutex<HashSet<CharBuf>>>;
 
     fn schedule(&mut self, mut permute: Permutation, buf: &mut Self::Buffer) {
-        let buf = self.buffer.clone();
+        let buf_ref = buf.clone();
+
         self.runtime.spawn(async move {
-            let mut lock = buf.lock().unwrap();
+            let mut lock = buf_ref.lock().unwrap();
             while let Some(x) = permute.commit() {            
                 lock.insert(x.clone());
             }

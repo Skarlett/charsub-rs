@@ -1,11 +1,9 @@
 use std::collections::{HashMap, HashSet};
 use crate::{
     Cell, RuleCell,
-    unit::Permutation,
-    patterns::{RuleEntry, ConstPattern, ModulusPattern},
+    patterns::RuleEntry,
     cursor::{Cursor, Output},
-    scheduler::Scheduler
-
+    scheduler::{Scheduler, Length}
 };
 
 pub use crate::patterns::Handler;
@@ -29,22 +27,23 @@ where T: IntoIterator<Item=(u8, RuleCell)>
     }
 }
 
-pub struct Generator<T> {
+pub struct Generator<T: Scheduler> {
     rules: Rulebook,
     gen_ctr: usize,
-    scheduler: T
+    scheduler: T,
+    buf: T::Buffer,
 }
 
-impl<T> Generator<T> {
-    pub fn new<R>(rules: R, scheduler: T) -> Self
-    where
-        R: Into<Rulebook>,
-        T: Scheduler
+impl<T> Generator<T> where T: Scheduler
+{
+    pub fn new<R>(rules: R, scheduler: T, buf: T::Buffer) -> Self
+    where R: Into<Rulebook>
     {
         Self {
             rules: rules.into(),
             gen_ctr: 0,
-            scheduler
+            scheduler,
+            buf
         }
     }
 
@@ -56,56 +55,48 @@ impl<T> Generator<T> {
         &self.rules
     }
     
-    pub fn new_generation<H>(&mut self, old_generation: HashSet<Cell>) -> HashSet<Cell> 
+    pub fn new_generation<H: Handler>(&mut self, old_generation: HashSet<Cell>) -> usize 
     where
         H: Handler,
         T: Scheduler
     {
-        let original = self.scheduler.buf_len();
-
+        let original = self.buf.length();
         let mut generation = HashSet::new();
         
         for item in &old_generation {
             let mut cursor = Cursor::new(&item, &self.rules.0);
-            permutate_cell::<T, H>(&mut cursor, &mut generation, &mut self.scheduler);
+            Self::permutate_cell::<H>(&mut self.scheduler, &mut cursor, &mut self.buf);
         }
 
         generation.union(&old_generation);
         self.gen_ctr += 1;
-        // self.total.len()-original;
-
-        unimplemented!()
+        self.buf.length()-original
     }
 
     pub fn generation(&self) -> usize {
         self.gen_ctr
     }
-}
 
-fn permutate_cell<S, H>(cursor: &mut Cursor, buffer: &mut HashSet<Cell>, scheduler: &mut S) -> usize
-where 
-    S: Scheduler,
-    H: Handler
-{
-    let original = buffer.len();
-    
-    loop {
-        match cursor.step() {
-            Output::Permute(permute) => {
-                if !H::handle(&permute) {
+    fn permutate_cell<H: Handler>(executor: &mut T, cursor: &mut Cursor, buf: &mut T::Buffer) -> usize {
+        let original = buf.length();
+        
+        loop {
+            match cursor.step() {
+                Output::Permute(permute) => {
+                    if !H::handle(&permute) {
+                        continue
+                    }
+                    executor.schedule(permute, buf);
+                },
+
+                Output::NoPermute(_idx) => {
                     continue
-                }
-                
-                scheduler.schedule(permute, buffer);
-            },
-
-            Output::NoPermute(_idx) => {
-                //println!("[{}]{:?}", cursor.cell_idx, cursor.buffer());
-                continue
-            },
-            Output::EndOfLine => break
+                },
+                Output::EndOfLine => break
+            }
         }
-    }
 
-    buffer.len()-original
+        buf.length()-original
+    }
 }
+
