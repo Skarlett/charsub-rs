@@ -48,7 +48,6 @@ impl Handler for ConstPattern {
 
 #[derive(Debug, Default)]
 pub struct ModulusPattern;
-
 impl Handler for ModulusPattern {
     fn handle(permute: &Permutation) -> bool {
         permute.index() % permute.len() == 0

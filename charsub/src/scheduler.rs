@@ -1,144 +1,87 @@
 use crate::{
     unit::Permutation,
     patterns::Handler,
-    Cell,
+    Cell as CharBuf,
 };
 
-use std::collections::HashSet;
+use std::{
+    collections::HashSet,
+};
 
-pub trait Scheduler: std::fmt::Debug {
-    type Buffer: Default;
+pub trait Scheduler {
+    type Buffer;
+    fn schedule(&mut self, permute: Permutation, buf: &mut Self::Buffer);
+    fn into_buf(&self) -> HashSet<CharBuf> { unimplemented!() }
+    fn buf_len(&self) -> usize { unimplemented!()}
+}
 
-    fn schedule<T: Handler>(&mut self, permute: Permutation);
-    fn flush(&mut self) -> Self::Buffer;
+enum SendData {
+    Arc(Arc<Mutex<HashSet<CharBuf>>>),
+    Set(HashSet<CharBuf>)
 }
 
 #[derive(Debug)]
-struct SingleThread {
-    storage: HashSet<Cell>
-}
+struct SingleThread;
 
 impl Scheduler for SingleThread {
-    type Buffer = HashSet<Cell>;
+    type Buffer = HashSet<CharBuf>;
 
-    fn schedule<T: Handler>(&mut self, mut permute: Permutation) {
-        if T::handle(&permute) {
-            while let Some(x) = permute.commit() {
-                self.storage.insert(x.clone());
-            }
+    fn schedule(&mut self, mut permute: Permutation, buf: &mut r) {
+        while let Some(x) = permute.commit() {
+            buf.insert(x.clone());
         }
     }
 
-    fn flush(&mut self) -> Self::Buffer {
-        std::mem::replace(&mut self.storage, Self::Buffer::default())
-    }
 }
-
 
 use std::sync::{Arc, Mutex};
 #[derive(Debug)]
 struct MultithreadMutex {
     pool: threadpool::ThreadPool,
-    collection: Arc<Mutex<HashSet<Cell>>>
+    storage: Arc<Mutex<HashSet<CharBuf>>>
 }
 
 impl Scheduler for MultithreadMutex {
-    type Buffer = HashSet<Cell>;
+    type Buffer = HashSet<CharBuf>;
 
-    fn schedule<T: Handler>(&mut self, mut permute: Permutation) {
-        if T::handle(&permute) {
-            let lock = self.collection.clone();
-            self.pool.execute(move || {
-                let mut lock = lock.lock().unwrap();
-
-                while let Some(x) = permute.commit() {
-                    lock.insert(x.clone());
-                }
-            })
-        }
-    }
-
-    fn flush(&mut self) -> Self::Buffer {
-        let data = self.collection.lock().unwrap().clone();
-        self.collection = Arc::new(Mutex::new(Self::Buffer::default()));
-        data
-    }
-}
-
-#[derive(Debug)]
-struct MultithreadEventual {
-    pool: threadpool::ThreadPool,
-    collection: Arc<Mutex<HashSet<Cell>>>
-}
-
-impl Scheduler for MultithreadEventual {
-    type Buffer = HashSet<Cell>;
-
-    fn schedule<T: Handler>(&mut self, mut permute: Permutation) {
-        let lock = self.collection.clone();
-
+    fn schedule(&mut self, mut permute: Permutation, buf: &mut Self::Buffer) {
+        let lock = self.storage.clone();
         self.pool.execute(move || {
-            if T::handle(&permute) {
-                let mut lock = lock.lock().unwrap();
-                while let Some(x) = permute.commit() {            
-                    lock.insert(x.clone());
-                }
+            
+            let mut lock = lock.lock().unwrap();
+            while let Some(x) = permute.commit() {
+                lock.insert(x.clone());
             }
         })
     }
 
-    fn flush(&mut self) -> Self::Buffer {
-        let data = self.collection.lock().unwrap().clone();
-        self.collection = Arc::new(Mutex::new(Self::Buffer::default()));
-        data
-    }
 }
 
 #[derive(Clone, Debug, Default)]
-struct HashSetWrapper(HashSet<Cell>);
+struct EVHashSet(HashSet<CharBuf>);
 
 #[derive(Clone, Debug)]
 enum Operation {
-    Push(Cell),
+    Push(CharBuf),
     Clear,
 }
 
-impl evc::OperationCache for HashSetWrapper {
-    type Operation = Operation;
-
-    fn apply_operation(&mut self, operation: Self::Operation) {
-        match operation {
-            Operation::Push(value) => { self.0.insert(value); },
-            Operation::Clear => self.0.clear(),
-        }
-    }
-}
-
-
 #[derive(Debug)]
-struct TokioEventual {
-    exchange: HashSetWrapper,
-    buffer: HashSet<Cell>
+struct TokioMutex {
+    runtime: tokio::runtime::Runtime,
+    buffer: Arc<Mutex<HashSet<CharBuf>>>
 }
 
-impl Scheduler for TokioEventual {
-    type Buffer = HashSet<Cell>;
+impl Scheduler for TokioMutex {
+    type Buffer = HashSet<CharBuf>;
 
-    fn schedule<T: Handler>(&mut self, mut permute: Permutation) {
-        use tokio::task;
-        tokio::runtime
-        task::spawn(async move {
-            if T::handle(&permute) {
-                while let Some(x) = permute.commit() {            
-                    lock.insert(x.clone());
-                }
+    fn schedule(&mut self, mut permute: Permutation, buf: &mut Self::Buffer) {
+        let buf = self.buffer.clone();
+        self.runtime.spawn(async move {
+            let mut lock = buf.lock().unwrap();
+            while let Some(x) = permute.commit() {            
+                lock.insert(x.clone());
             }
-        })
-    }
-
-    fn flush(&mut self) -> Self::Buffer {
-        let data = self.buffer.lock().unwrap().clone();
-        self.collection = Arc::new(Mutex::new(Self::Buffer::default()));
-        data
+        });
     }
 }

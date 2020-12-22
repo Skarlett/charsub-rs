@@ -19,6 +19,10 @@ impl Permutation {
         }
     }
 
+    pub fn changes(&self) -> usize {
+        self.rule.len()
+    }
+
     pub fn index(&self) -> usize {
         self.cell_idx
     }
