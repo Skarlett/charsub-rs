@@ -1,6 +1,6 @@
 [package]
 name = "charsub"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Skarlett <zykl@protonmail.com>"]
 edition = "2018"
 
@@ -12,5 +12,7 @@ name = "charsub"
 [dependencies]
 smallvec = "*"
 threadpool = "*"
-tokio = { version = "0.3", features = ["stream", "rt", "parking_lot"]}
+tokio = { version = "0.3", features = ["stream", "rt", "parking_lot", "sync"]}
 evc = "0.1"
+
+hashbrown = "0.9"

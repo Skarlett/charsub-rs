@@ -12,3 +12,7 @@ path = "main.rs"
 charsub = { path = "../charsub" }
 structopt = { version = "0.3", feature = ["smallvec"] }
 smallvec = "*"
+threadpool = "*"
+tokio = { features = [ "full", "rt-multi-thread" ], version = "*" }
+
+hashbrown = "*"
