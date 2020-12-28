@@ -40,8 +40,8 @@ impl From<RuleEntry> for RuleCell {
 #[derive(Debug, Default)]
 pub struct ConstPattern;
 impl Handler for ConstPattern {
-    fn handle(permute: &Permutation) -> bool {
-        true
+    fn handle(_permute: &Permutation) -> bool {
+        false
     }
 }
 

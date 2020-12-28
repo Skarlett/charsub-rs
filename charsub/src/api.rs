@@ -1,16 +1,18 @@
-use std::collections::{HashMap, HashSet};
 use crate::{
     Cell, RuleCell,
     patterns::RuleEntry,
     cursor::{Cursor, Output},
-    scheduler::{Scheduler, Length}
+    scheduler::Scheduler
 };
+
+use hashbrown::{HashSet, HashMap};
 
 pub use crate::patterns::Handler;
 
+#[derive(Debug,)]
 pub struct Rulebook(pub HashMap<u8, RuleEntry>);
 
-impl<T> From<T> for Rulebook 
+impl<'a, T> From<T> for Rulebook 
 where T: IntoIterator<Item=(u8, RuleCell)>
 {
     fn from(x: T) -> Rulebook {
@@ -18,7 +20,7 @@ where T: IntoIterator<Item=(u8, RuleCell)>
         for (k, r) in x.into_iter() {
             let rule = match r.len() {
                 1 => RuleEntry::Single(*r.get(0).unwrap()),
-                i if i > 1 => RuleEntry::Multi(r),
+                i if i > 1 => RuleEntry::Multi(RuleCell::from(r)),
                 _ => panic!("lolwhut")
             };
             map.insert(k, rule);
@@ -27,26 +29,27 @@ where T: IntoIterator<Item=(u8, RuleCell)>
     }
 }
 
-pub struct Generator<T: Scheduler> {
+#[derive(Debug)]
+pub struct Generator<T> {
     rules: Rulebook,
     gen_ctr: usize,
     scheduler: T,
-    buf: T::Buffer,
 }
 
-impl<T> Generator<T> where T: Scheduler
+impl<T> Generator<T>
 {
-    pub fn new<R>(rules: R, scheduler: T, buf: T::Buffer) -> Self
-    where R: Into<Rulebook>
+    pub fn new<R>(rules: R, scheduler: T) -> Self
+    where
+        R: Into<Rulebook>,
+        T: Scheduler
     {
         Self {
             rules: rules.into(),
             gen_ctr: 0,
             scheduler,
-            buf
+        //  buf
         }
     }
-
     /// This function returns the map
     /// used to replace characters with
     /// where the key (`u8`), is the character
@@ -55,48 +58,62 @@ impl<T> Generator<T> where T: Scheduler
         &self.rules
     }
     
-    pub fn new_generation<H: Handler>(&mut self, old_generation: HashSet<Cell>) -> usize 
+    pub fn new_generation<H>(&mut self)
     where
         H: Handler,
         T: Scheduler
     {
-        let original = self.buf.length();
-        let mut generation = HashSet::new();
-        
-        for item in &old_generation {
-            let mut cursor = Cursor::new(&item, &self.rules.0);
-            Self::permutate_cell::<H>(&mut self.scheduler, &mut cursor, &mut self.buf);
-        }
-
-        generation.union(&old_generation);
-        self.gen_ctr += 1;
-        self.buf.length()-original
+        self.scheduler.new_generation::<H>(&self.rules)
     }
 
     pub fn generation(&self) -> usize {
         self.gen_ctr
     }
 
-    fn permutate_cell<H: Handler>(executor: &mut T, cursor: &mut Cursor, buf: &mut T::Buffer) -> usize {
-        let original = buf.length();
-        
-        loop {
-            match cursor.step() {
-                Output::Permute(permute) => {
-                    if !H::handle(&permute) {
-                        continue
-                    }
-                    executor.schedule(permute, buf);
-                },
+    pub fn length(&self) -> usize 
+    where T: Scheduler + Length
+    {
+        self.scheduler.length()        
+    }
 
-                Output::NoPermute(_idx) => {
-                    continue
-                },
-                Output::EndOfLine => break
-            }
-        }
+    pub fn done(&self) -> bool
+    where T: Scheduler
+    {
+        self.scheduler.clean_state()
+    }
 
-        buf.length()-original
+    pub fn into_set(self) -> HashSet<Cell> 
+    where T: Scheduler + Into<HashSet<Cell>>
+    {
+        self.scheduler.into()
+    }
+
+    pub fn seed<I>(&mut self, item: I)
+    where 
+        T: Scheduler,
+        I: Into<Cell>
+    {
+        self.scheduler.push(item.into());
     }
 }
 
+// pub trait PreEmptiveAlloc {
+//     fn init_capacity(size: usize) -> Self;
+// }
+
+pub trait Length {
+    fn length(&self) -> usize;
+}
+
+impl Length for HashSet<Cell> {
+    fn length(&self) -> usize {
+        self.len()
+    }
+}
+
+use std::sync::{Arc, Mutex};
+impl Length for Arc<Mutex<HashSet<Cell>>> {
+    fn length(&self) -> usize {
+        self.lock().unwrap().len()
+    }
+}

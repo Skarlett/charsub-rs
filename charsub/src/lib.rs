@@ -4,12 +4,14 @@ mod patterns;
 mod unit;
 mod cursor;
 mod api;
-mod scheduler;
+pub mod scheduler;
 
-
-//pub use api::*;
+pub use scheduler::Scheduler;
+pub use unit::Permutation;
+pub use api::*;
+pub use patterns::*;
 
 use smallvec::SmallVec;
 
-type Cell = SmallVec<[u8; 32]>;
+pub type Cell = SmallVec<[u8; 32]>;
 pub type RuleCell = SmallVec<[u8; 8]>;
