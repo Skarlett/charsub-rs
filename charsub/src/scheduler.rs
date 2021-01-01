@@ -44,7 +44,7 @@ pub trait Scheduler {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct SingleThread {
     buf: HashSet<CharBuf>   
 }
@@ -86,7 +86,7 @@ impl Scheduler for SingleThread {
 
     fn new_generation<H>(&mut self, rules: &Rulebook) where H: Handler {
         let mut buf = std::mem::replace(&mut self.buf, HashSet::new());
-        println!("{:?}", buf.clone().iter().map(|x| String::from_utf8_lossy(&x)).collect::<Vec<_>>());
+        //println!("{:?}", buf.clone().iter().map(|x| String::from_utf8_lossy(&x)).collect::<Vec<_>>());
         for item in &buf {
             let mut cursor = Cursor::new(&item, rules);
             self.permutate_cell::<H>(&mut cursor);
@@ -101,7 +101,7 @@ fn shared_buf() -> Arc<Mutex<HashSet<CharBuf>>> {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct MultithreadMutex {
     pool: threadpool::ThreadPool,
     buf: Arc<Mutex<HashSet<CharBuf>>>
@@ -162,17 +162,27 @@ impl Scheduler for MultithreadMutex {
     }
 }
 
+lazy_static! {
+    static ref RT: Arc<tokio::runtime::Runtime> = Arc::new(tokio::runtime::Runtime::new().unwrap());
+}
 
 #[derive(Debug)]
 pub struct TokioMutex {
-    runtime: tokio::runtime::Runtime,
+    runtime: Arc<tokio::runtime::Runtime>,
     buf: Arc<Mutex<HashSet<CharBuf>>>
 }
 
+impl Default for TokioMutex {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TokioMutex {
+
     #[inline]
-    pub fn new(runtime: tokio::runtime::Runtime) -> Self {
-        Self { runtime, buf: Arc::new(Mutex::new(Default::default())) }
+    pub fn new() -> Self {
+        Self { runtime: RT.clone(), buf: Arc::new(Mutex::new(Default::default())) }
     }
 }
 

@@ -32,7 +32,7 @@ impl Schedules {
     pub fn from_opt(opts: &Opt) -> Self {
         match opts.scheduler {
             SchedulerInput::AsyncRuntime => Schedules::Async(
-                TokioMutex::new(tokio::runtime::Runtime::new().unwrap())
+                TokioMutex::new()
             ),
             SchedulerInput::ThreadPool => Schedules::Pool(MultithreadMutex::new(opts.workers)),
             SchedulerInput::SingleThread => Schedules::SingleThread(SingleThread::new())

@@ -14,5 +14,16 @@ smallvec = "*"
 threadpool = "*"
 tokio = { version = "0.3", features = ["stream", "rt", "parking_lot", "sync"]}
 evc = "0.1"
+lazy_static = "*"
 
 hashbrown = "0.9"
+
+[dev-dependencies]
+rand = "0.8"
+lazy_static = "1.4"
+paste = "1.0"
+num_cpus = "*"
+
+[[bench]]
+name = "bench"
+path = "bench/schedulers.rs"

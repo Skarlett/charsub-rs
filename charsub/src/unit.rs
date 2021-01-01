@@ -46,7 +46,7 @@ impl Permutation {
     pub fn commit<'s>(&'s mut self) -> Option<&'s crate::Cell> {
         match &self.rule {
             RuleEntry::Single(_byte) => {
-                println!("rules: {}", *_byte as char);
+                //println!("rules: {}", *_byte as char);
 
                 if self.rule_idx > 0 {
                     return None
@@ -56,7 +56,7 @@ impl Permutation {
             }
 
             RuleEntry::Multi(rules) => {
-                println!("rules: {}", String::from_utf8_lossy(&rules));
+                //println!("rules: {}", String::from_utf8_lossy(&rules));
                 if self.rule.len() >= self.rule_idx+1 {
                     self.cell[self.cell_idx] = *rules.get(self.rule_idx).unwrap();
                     self.rule_idx += 1;
