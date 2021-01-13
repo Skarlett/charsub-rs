@@ -22,7 +22,7 @@ pub trait Scheduler {
 
     fn permutate_cell<H>(&mut self, cursor: &mut Cursor)
     where
-        H: Handler+ std::fmt::Debug
+        H: Handler + std::fmt::Debug
     {
         loop {
             match cursor.step() {
@@ -30,7 +30,7 @@ pub trait Scheduler {
                     if H::handle(&permute) {
                         continue
                     }
-                    self.schedule(dbg!(permute));
+                    self.schedule(permute);
                 },
 
                 Output::NoPermute(_idx) => {
@@ -226,4 +226,111 @@ impl Scheduler for TokioMutex {
     fn push(&mut self, item: CharBuf) {
         self.buf.lock().unwrap().insert(item);
     }
+}
+
+
+
+#[derive(Debug)]
+pub struct UnsafeBuf {
+    rt: Arc<tokio::runtime::Runtime>,
+    buf: HashSet<CharBuf>,
+    arc: Arc<usize>
+}
+
+impl Default for UnsafeBuf {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl UnsafeBuf {
+    #[inline]
+    pub fn new() -> Self {
+        Self { ..Default::default() }
+    }
+}
+
+impl Into<HashSet<CharBuf>> for UnsafeBuf {
+    fn into(self) -> HashSet<CharBuf> {
+        self.buf
+    }
+}
+
+impl Length for UnsafeBuf {
+    fn length(&self) -> usize {
+        self.buf.len()
+    }
+}
+
+
+struct UnsafePtr(*mut HashSet<CharBuf>);
+impl Into<*mut HashSet<CharBuf>> for UnsafePtr {
+    fn into(self) -> *mut HashSet<CharBuf> {
+        self.0
+    }
+}
+
+impl From<*mut HashSet<CharBuf>> for UnsafePtr {
+    fn from(x: *mut HashSet<CharBuf>) -> Self {
+        UnsafePtr(x)
+    }
+} 
+
+impl From<&mut HashSet<CharBuf>> for UnsafePtr {
+    fn from(x: &mut HashSet<CharBuf>) -> Self {
+        let temp: *mut HashSet<CharBuf> = &mut *x;
+        UnsafePtr(temp)
+    }
+} 
+
+unsafe impl Send for UnsafePtr {}
+unsafe impl Sync for UnsafePtr {}
+
+impl Scheduler for UnsafeBuf
+where Self: 'static {
+    fn new_generation<H>(&mut self, rules: &Rulebook) where H: Handler { 
+        let lock: Vec<_> = self.buf.drain().collect();
+        
+        for item in lock {
+            let mut cursor = Cursor::new(&item, rules);
+            self.permutate_cell::<H>(&mut cursor);
+        }
+    }
+
+    fn schedule(&mut self, mut permute: Permutation) {
+            // let ptr: *mut HashSet<CharBuf> = &mut self.buf;
+            // let ptr2: *mut HashSet<CharBuf> = &mut self.buf;
+            
+            // unsafe {
+            //     let buf: &mut HashSet<CharBuf> = &mut *ptr;
+            //     let buf2: &mut HashSet<CharBuf> = &mut *ptr2;
+            // }
+            let arc = self.arc.clone();
+            let ptr: *mut HashSet<CharBuf> = &mut self.buf;
+            let ptr = UnsafePtr(ptr);
+
+            self.rt.spawn(async move {
+
+                while let Some(x) = permute.commit() {
+                    unsafe {
+                        let buf: &mut HashSet<CharBuf> = &mut *ptr.0; 
+                        buf.insert(x.clone());
+                    }
+                }
+                let _ = arc.overflowing_add(1); // so the arc isn't optimized out
+            });
+        }
+
+    fn clean_state(&self) -> bool {
+        Arc::strong_count(&self.arc) == 1
+    }
+
+    fn push(&mut self, item: CharBuf) {
+        self.buf.insert(item);
+    }
+}
+
+#[test]
+fn unsafe_buf_behave() {
+    
 }

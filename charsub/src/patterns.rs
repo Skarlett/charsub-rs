@@ -5,6 +5,7 @@ use crate::{
 
 pub trait Handler
 where Self: std::fmt::Debug + Default {
+    #[inline]
     fn handle(permute: &Permutation) -> bool;
 }
 

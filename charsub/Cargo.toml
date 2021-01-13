@@ -12,7 +12,7 @@ name = "charsub"
 [dependencies]
 smallvec = "*"
 threadpool = "*"
-tokio = { version = "0.3", features = ["stream", "rt", "parking_lot", "sync"]}
+tokio = { version = "1.0", features = ["full", "rt-multi-thread", "parking_lot"]}
 evc = "0.1"
 lazy_static = "*"
 
@@ -23,7 +23,9 @@ rand = "0.8"
 lazy_static = "1.4"
 paste = "1.0"
 num_cpus = "*"
+criterion = "0.3"
 
 [[bench]]
 name = "bench"
 path = "bench/schedulers.rs"
+harness = false

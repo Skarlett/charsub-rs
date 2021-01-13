@@ -38,7 +38,6 @@ fn main() {
 
     loop {
         let last = gen.length();
-        //println!("{:?}", &gen);
         match pattern {
             Pattern::Const => gen.new_generation::<ConstPattern>(),
             Pattern::Modulo => gen.new_generation::<ModulusPattern>(),
